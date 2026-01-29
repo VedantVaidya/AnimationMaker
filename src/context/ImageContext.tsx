@@ -8,14 +8,15 @@ interface ImageContextType {
     keyframes: Keyframe[];
     activeKeyframeId: string | null;
     isPlaying: boolean;
+    currentDuration: number; // To pass to CSS transition
 
     addImage: (file: File) => void;
     removeImage: (id: string) => void;
     selectImage: (id: string | null) => void;
     updateImageState: (id: string, newState: Partial<TransformState>) => void;
 
-    addKeyframe: () => void;
-    updateKeyframe: (id: string) => void;
+    addKeyframe: (duration?: number) => void;
+    updateKeyframe: (id: string, duration?: number) => void;
     loadKeyframe: (id: string) => void;
     deleteKeyframe: (id: string) => void;
     playAnimation: () => void;
@@ -31,32 +32,53 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [keyframes, setKeyframes] = useState<Keyframe[]>([]);
     const [activeKeyframeId, setActiveKeyframeId] = useState<string | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [currentDuration, setCurrentDuration] = useState(3000);
     const playbackTimeoutRef = useRef<number | null>(null);
     const currentKeyframeIndexRef = useRef(0);
 
     const addImage = (file: File) => {
         const objectUrl = URL.createObjectURL(file);
-        const newImage: ImageObject = {
-            id: crypto.randomUUID(),
-            src: objectUrl,
-            name: file.name,
-        };
+        const img = new Image();
+        img.src = objectUrl;
 
-        // Initial state
-        const initialState: TransformState = {
-            x: 300,
-            y: 300,
-            width: 200,
-            height: 200,
-            rotation: 0,
-            scaleX: 1,
-            scaleY: 1,
-            zIndex: Object.keys(imageStates).length + 1,
-        };
+        img.onload = () => {
+            const aspectRatio = img.naturalWidth / img.naturalHeight;
+            // Default max size 200px constraint while maintaining ratio
+            let width = 200;
+            let height = 200;
 
-        setImages((prev) => [...prev, newImage]);
-        setImageStates((prev) => ({ ...prev, [newImage.id]: initialState }));
-        setSelectedImageId(newImage.id);
+            if (aspectRatio > 1) {
+                // Landscape
+                width = 200;
+                height = 200 / aspectRatio;
+            } else {
+                // Portrait
+                height = 200;
+                width = 200 * aspectRatio;
+            }
+
+            const newImage: ImageObject = {
+                id: crypto.randomUUID(),
+                src: objectUrl,
+                name: file.name,
+            };
+
+            // Initial state with calculated dimensions
+            const initialState: TransformState = {
+                x: 300,
+                y: 300,
+                width,
+                height,
+                rotation: 0,
+                scaleX: 1,
+                scaleY: 1,
+                zIndex: Object.keys(imageStates).length + 1,
+            };
+
+            setImages((prev) => [...prev, newImage]);
+            setImageStates((prev) => ({ ...prev, [newImage.id]: initialState }));
+            setSelectedImageId(newImage.id);
+        };
     };
 
     const selectImage = (id: string | null) => {
@@ -86,22 +108,25 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         });
     };
 
-    const addKeyframe = () => {
+    const addKeyframe = (duration: number = 3000) => {
         const newKeyframe: Keyframe = {
             id: crypto.randomUUID(),
-            // In a real app we might use index order, but timestamp works for ID
-            // Logic: Append to end
             timestamp: Date.now(),
+            duration, // Store duration
             objectsState: JSON.parse(JSON.stringify(imageStates)),
         };
         setKeyframes((prev) => [...prev, newKeyframe]);
         setActiveKeyframeId(newKeyframe.id);
     };
 
-    const updateKeyframe = (id: string) => {
+    const updateKeyframe = (id: string, duration?: number) => {
         setKeyframes((prev) => prev.map((kf) =>
             kf.id === id
-                ? { ...kf, objectsState: JSON.parse(JSON.stringify(imageStates)) }
+                ? {
+                    ...kf,
+                    objectsState: JSON.parse(JSON.stringify(imageStates)),
+                    duration: duration !== undefined ? duration : kf.duration
+                }
                 : kf
         ));
     };
@@ -141,6 +166,9 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             }
 
             // Apply next state
+            const nextKeyframe = keyframes[currentKeyframeIndexRef.current];
+            const duration = nextKeyframe.duration || 3000;
+            setCurrentDuration(duration); // Update CSS transition duration
             const nextState = keyframes[currentKeyframeIndexRef.current].objectsState;
             setImageStates(JSON.parse(JSON.stringify(nextState)));
 
@@ -177,6 +205,7 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             keyframes,
             activeKeyframeId,
             isPlaying,
+            currentDuration,
             addImage,
             removeImage,
             selectImage,

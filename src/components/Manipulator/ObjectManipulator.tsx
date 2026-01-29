@@ -9,7 +9,7 @@ interface ObjectManipulatorProps {
 }
 
 export const ObjectManipulator: React.FC<ObjectManipulatorProps> = ({ id, src, state }) => {
-    const { selectedImageId, selectImage, updateImageState, isPlaying } = useImageContext();
+    const { selectedImageId, selectImage, updateImageState, isPlaying, currentDuration } = useImageContext();
     const isSelected = selectedImageId === id;
     const isDragging = useRef(false);
     const isResizing = useRef(false);
@@ -49,10 +49,24 @@ export const ObjectManipulator: React.FC<ObjectManipulatorProps> = ({ id, src, s
                 const deltaX = e.clientX - resizeStart.current.x;
                 const deltaY = e.clientY - resizeStart.current.y;
 
-                // Free resize (stretch)
+                // User requirement: Default = Preserve Aspect Ratio. 
+                // Hold Cmd (Meta) or Alt to Free Resize.
+                const isFreeResize = e.metaKey || e.altKey;
+
+                let newWidth = Math.max(20, resizeStart.current.width + deltaX);
+                let newHeight = Math.max(20, resizeStart.current.height + deltaY);
+
+                if (!isFreeResize) {
+                    // Lock aspect ratio
+                    const ratio = resizeStart.current.width / resizeStart.current.height;
+                    // We can simply take the larger delta or just X to drive Y?
+                    // Let's use the width to drive height for simplicity or max change
+                    newHeight = newWidth / ratio;
+                }
+
                 updateImageState(id, {
-                    width: Math.max(20, resizeStart.current.width + deltaX),
-                    height: Math.max(20, resizeStart.current.height + deltaY),
+                    width: newWidth,
+                    height: newHeight,
                 });
             }
         };

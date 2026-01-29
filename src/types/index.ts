@@ -28,4 +28,5 @@ export type Keyframe = {
     // But requirement says "key frame of all the images are recorded at that position for 3 seconds".
     // So maybe just an ordered list of states is enough.
     objectsState: Record<string, TransformState>; // Map ImageID -> State
+    duration?: number; // Duration of this frame (or segment leading to next?)
 };

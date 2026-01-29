@@ -114,10 +114,28 @@ export const Controllers: React.FC = () => {
             {/* Animation Controls */}
             <div style={{ marginTop: 'auto', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '15px' }}>
                 <h3 style={{ margin: '0 0 10px 0', fontSize: '1.2rem', fontWeight: 600 }}>Animation</h3>
+                <div style={{ marginBottom: '10px' }}>
+                    <label style={{ display: 'block', fontSize: '11px', marginBottom: '5px', opacity: 0.7 }}>Duration (ms)</label>
+                    <input
+                        type="number"
+                        defaultValue={3000}
+                        step={100}
+                        min={100}
+                        onChange={(e) => {
+                            // Temporary storage or ref? 
+                            // We need to pass this to addKeyframe.
+                            // Let's us a ref or state in Controller?
+                            // Actually, let's use a local ref for now since it's just for the next freeze.
+                            (window as any).__nextDuration = Number(e.target.value);
+                        }}
+                        style={{ width: '100%', padding: '5px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
+                    />
+                </div>
+
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '15px' }}>
                     <Button
                         variant="danger"
-                        onClick={addKeyframe}
+                        onClick={() => addKeyframe((window as any).__nextDuration || 3000)}
                         disabled={isPlaying}
                         style={{ flex: 1 }}
                     >
