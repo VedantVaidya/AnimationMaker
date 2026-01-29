@@ -1,0 +1,62 @@
+.button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.button:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+}
+
+.button:active:not(:disabled) {
+    transform: translateY(0);
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Variants */
+.primary {
+    background: linear-gradient(135deg, #007bff, #00d2ff);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #0069d9, #00bfff);
+}
+
+.danger {
+    background: linear-gradient(135deg, #dc3545, #ff6b6b);
+}
+
+.danger:hover:not(:disabled) {
+    background: linear-gradient(135deg, #c82333, #fa5252);
+}
+
+.success {
+    background: linear-gradient(135deg, #28a745, #5ddc72);
+}
+
+.success:hover:not(:disabled) {
+    background: linear-gradient(135deg, #218838, #4cd061);
+}
+
+.warning {
+    background: linear-gradient(135deg, #fd7e14, #ffc107);
+    color: #000;
+}

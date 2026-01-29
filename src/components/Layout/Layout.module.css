@@ -1,0 +1,51 @@
+.container {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    /* Rich gradient background */
+}
+
+.controllers {
+    width: 15%;
+    /* Slightly wider for better inputs */
+    min-width: 250px;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    overflow-y: auto;
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+    z-index: 10;
+}
+
+.preview {
+    width: 90%;
+    height: 100%;
+    position: relative;
+    background-color: #1a1a1a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    /* For panning if needed later, or hidden to contain images */
+}
+
+/* Scrollbar styling for controllers */
+.controllers::-webkit-scrollbar {
+    width: 6px;
+}
+
+.controllers::-webkit-scrollbar-track {
+    background: #242424;
+}
+
+.controllers::-webkit-scrollbar-thumb {
+    background-color: #444;
+    border-radius: 3px;
+}
