@@ -219,18 +219,24 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setSelectedImageId(null);
     };
 
+    const getActiveIndex = () => {
+        if (activeKeyframeId) {
+            const idx = keyframes.findIndex((kf) => kf.id === activeKeyframeId);
+            if (idx >= 0) return idx;
+        }
+        return null;
+    };
+
     const stepNext = () => {
         if (keyframes.length === 0) return;
-        const nextIndex = currentStepIndex === null ? 0 : (currentStepIndex + 1) % keyframes.length;
-        stepTo(nextIndex);
+        const base = currentStepIndex ?? getActiveIndex() ?? -1;
+        stepTo((base + 1) % keyframes.length);
     };
 
     const stepPrev = () => {
         if (keyframes.length === 0) return;
-        const prevIndex = currentStepIndex === null
-            ? keyframes.length - 1
-            : (currentStepIndex - 1 + keyframes.length) % keyframes.length;
-        stepTo(prevIndex);
+        const base = currentStepIndex ?? getActiveIndex() ?? keyframes.length;
+        stepTo((base - 1 + keyframes.length) % keyframes.length);
     };
 
     const reorderKeyframes = (fromIndex: number, gapIndex: number) => {

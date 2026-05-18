@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useImageContext } from '../../context/ImageContext';
 import { Button } from '../common/Button';
 
@@ -30,6 +30,19 @@ export const Controllers: React.FC = () => {
     const projectInputRef = useRef<HTMLInputElement>(null);
     const dragIndexRef = useRef<number | null>(null);
     const [dropGap, setDropGap] = React.useState<number | null>(null);
+
+    const DOT_COLORS = ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff922b', '#cc5de8', '#20c997', '#f06595'];
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+            if (keyframes.length === 0) return;
+            if (e.key === 'ArrowRight') { e.preventDefault(); stepNext(); }
+            else if (e.key === 'ArrowLeft') { e.preventDefault(); stepPrev(); }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [keyframes.length, stepNext, stepPrev]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -212,22 +225,21 @@ export const Controllers: React.FC = () => {
                         Freeze
                     </Button>
 
-                    <Button
-                        onClick={stepPrev}
-                        disabled={keyframes.length === 0}
-                        style={{ flex: 1 }}
-                    >
-                        Prev
-                    </Button>
-
-                    <Button
-                        variant="success"
-                        onClick={stepNext}
-                        disabled={keyframes.length === 0}
-                        style={{ flex: 1 }}
-                    >
-                        Next
-                    </Button>
+                    {!isPlaying ? (
+                        <Button
+                            variant="success"
+                            onClick={stepNext}
+                            disabled={keyframes.length === 0}
+                            style={{ flex: 1 }}
+                        >
+                            Play
+                        </Button>
+                    ) : (
+                        <>
+                            <Button onClick={stepPrev} style={{ flex: 1 }}>Prev</Button>
+                            <Button variant="success" onClick={stepNext} style={{ flex: 1 }}>Next</Button>
+                        </>
+                    )}
                 </div>
 
                 {isPlaying && (
@@ -291,8 +303,8 @@ export const Controllers: React.FC = () => {
                                     height: '14px',
                                     borderRadius: '50%',
                                     flexShrink: 0,
-                                    background: activeKeyframeId === kf.id ? '#00d2ff' : 'rgba(255,255,255,0.2)',
-                                    border: activeKeyframeId === kf.id ? '2px solid rgba(255,255,255,0.5)' : '2px solid transparent',
+                                    background: activeKeyframeId === kf.id ? DOT_COLORS[index % DOT_COLORS.length] : DOT_COLORS[index % DOT_COLORS.length] + '66',
+                                    border: activeKeyframeId === kf.id ? '2px solid rgba(255,255,255,0.7)' : '2px solid transparent',
                                     cursor: isPlaying ? 'default' : 'grab',
                                     transform: activeKeyframeId === kf.id ? 'scale(1.2)' : 'scale(1)',
                                     transition: 'all 0.2s ease',
