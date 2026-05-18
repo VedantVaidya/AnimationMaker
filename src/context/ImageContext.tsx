@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, type ReactNode } from 'react';
 import type { ImageObject, TransformState, Keyframe } from '../types';
 
 interface ImageContextType {
@@ -8,7 +8,8 @@ interface ImageContextType {
     keyframes: Keyframe[];
     activeKeyframeId: string | null;
     isPlaying: boolean;
-    currentDuration: number; // To pass to CSS transition
+    currentDuration: number;
+    currentStepIndex: number | null;
 
     addImage: (file: File) => void;
     removeImage: (id: string) => void;
@@ -19,8 +20,9 @@ interface ImageContextType {
     updateKeyframe: (id: string, duration?: number) => void;
     loadKeyframe: (id: string) => void;
     deleteKeyframe: (id: string) => void;
-    playAnimation: () => void;
-    stopAnimation: () => void;
+    stepNext: () => void;
+    stepPrev: () => void;
+    exitStepMode: () => void;
 }
 
 const ImageContext = createContext<ImageContextType | undefined>(undefined);
@@ -32,9 +34,8 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [keyframes, setKeyframes] = useState<Keyframe[]>([]);
     const [activeKeyframeId, setActiveKeyframeId] = useState<string | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
-    const [currentDuration, setCurrentDuration] = useState(3000);
-    const playbackTimeoutRef = useRef<number | null>(null);
-    const currentKeyframeIndexRef = useRef(0);
+    const [currentDuration, setCurrentDuration] = useState(500);
+    const [currentStepIndex, setCurrentStepIndex] = useState<number | null>(null);
 
     const addImage = (file: File) => {
         const objectUrl = URL.createObjectURL(file);
@@ -43,16 +44,13 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
         img.onload = () => {
             const aspectRatio = img.naturalWidth / img.naturalHeight;
-            // Default max size 200px constraint while maintaining ratio
             let width = 200;
             let height = 200;
 
             if (aspectRatio > 1) {
-                // Landscape
                 width = 200;
                 height = 200 / aspectRatio;
             } else {
-                // Portrait
                 height = 200;
                 width = 200 * aspectRatio;
             }
@@ -63,7 +61,6 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 name: file.name,
             };
 
-            // Initial state with calculated dimensions
             const initialState: TransformState = {
                 x: 300,
                 y: 300,
@@ -82,12 +79,12 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     const selectImage = (id: string | null) => {
-        if (isPlaying) return; // Prevent selection during playback
+        if (isPlaying) return;
         setSelectedImageId(id);
     };
 
     const updateImageState = (id: string, newState: Partial<TransformState>) => {
-        if (isPlaying) return; // Prevent edits during playback
+        if (isPlaying) return;
         setImageStates((prev) => ({
             ...prev,
             [id]: { ...prev[id], ...newState },
@@ -97,22 +94,20 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const removeImage = (id: string) => {
         setImages((prev) => {
             const img = prev.find((i) => i.id === id);
-            if (img) {
-                URL.revokeObjectURL(img.src);
-            }
+            if (img) URL.revokeObjectURL(img.src);
             return prev.filter((i) => i.id !== id);
         });
         setImageStates((prev) => {
-            const { [id]: deleted, ...rest } = prev;
+            const { [id]: _deleted, ...rest } = prev;
             return rest;
         });
     };
 
-    const addKeyframe = (duration: number = 3000) => {
+    const addKeyframe = (duration: number = 500) => {
         const newKeyframe: Keyframe = {
             id: crypto.randomUUID(),
             timestamp: Date.now(),
-            duration, // Store duration
+            duration,
             objectsState: JSON.parse(JSON.stringify(imageStates)),
         };
         setKeyframes((prev) => [...prev, newKeyframe]);
@@ -125,7 +120,7 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 ? {
                     ...kf,
                     objectsState: JSON.parse(JSON.stringify(imageStates)),
-                    duration: duration !== undefined ? duration : kf.duration
+                    duration: duration !== undefined ? duration : kf.duration,
                 }
                 : kf
         ));
@@ -142,60 +137,37 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const deleteKeyframe = (id: string) => {
         setKeyframes((prev) => prev.filter((k) => k.id !== id));
-        if (activeKeyframeId === id) {
-            setActiveKeyframeId(null);
-        }
+        if (activeKeyframeId === id) setActiveKeyframeId(null);
     };
 
-    const playAnimation = () => {
-        if (keyframes.length < 1) return;
+    const stepTo = (index: number) => {
+        const targetKf = keyframes[index];
+        setCurrentDuration(targetKf.duration || 500);
         setIsPlaying(true);
+        setImageStates(JSON.parse(JSON.stringify(targetKf.objectsState)));
+        setCurrentStepIndex(index);
+        setActiveKeyframeId(targetKf.id);
         setSelectedImageId(null);
-        currentKeyframeIndexRef.current = 0;
-
-        // Start with first frame immediately
-        setImageStates(JSON.parse(JSON.stringify(keyframes[0].objectsState)));
-
-        const nextFrame = () => {
-            currentKeyframeIndexRef.current += 1;
-
-            if (currentKeyframeIndexRef.current >= keyframes.length) {
-                setIsPlaying(false);
-                currentKeyframeIndexRef.current = 0;
-                return;
-            }
-
-            // Apply next state
-            const nextKeyframe = keyframes[currentKeyframeIndexRef.current];
-            const duration = nextKeyframe.duration || 3000;
-            setCurrentDuration(duration); // Update CSS transition duration
-            const nextState = keyframes[currentKeyframeIndexRef.current].objectsState;
-            setImageStates(JSON.parse(JSON.stringify(nextState)));
-
-            // Schedule next
-            playbackTimeoutRef.current = setTimeout(nextFrame, 3000); // 3 seconds per frame
-        };
-
-        // First transition happens after 1 tick to ensure CSS transition sees the change?
-        // Actually, we want to animate TO the next frame.
-        // If we are at frame 0, we want to animate to frame 1 over 3 seconds.
-        // So we wait very briefly then trigger nextFrame? or just normal flow.
-        // Let's rely on the loop.
-        playbackTimeoutRef.current = setTimeout(nextFrame, 3000);
     };
 
-    const stopAnimation = () => {
+    const stepNext = () => {
+        if (keyframes.length === 0) return;
+        const nextIndex = currentStepIndex === null ? 0 : (currentStepIndex + 1) % keyframes.length;
+        stepTo(nextIndex);
+    };
+
+    const stepPrev = () => {
+        if (keyframes.length === 0) return;
+        const prevIndex = currentStepIndex === null
+            ? keyframes.length - 1
+            : (currentStepIndex - 1 + keyframes.length) % keyframes.length;
+        stepTo(prevIndex);
+    };
+
+    const exitStepMode = () => {
         setIsPlaying(false);
-        if (playbackTimeoutRef.current) {
-            clearTimeout(playbackTimeoutRef.current);
-        }
+        setCurrentStepIndex(null);
     };
-
-    useEffect(() => {
-        return () => {
-            if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
-        };
-    }, []);
 
     return (
         <ImageContext.Provider value={{
@@ -206,6 +178,7 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             activeKeyframeId,
             isPlaying,
             currentDuration,
+            currentStepIndex,
             addImage,
             removeImage,
             selectImage,
@@ -214,8 +187,9 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             updateKeyframe,
             loadKeyframe,
             deleteKeyframe,
-            playAnimation,
-            stopAnimation
+            stepNext,
+            stepPrev,
+            exitStepMode,
         }}>
             {children}
         </ImageContext.Provider>

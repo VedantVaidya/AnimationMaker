@@ -99,7 +99,7 @@ export const ObjectManipulator: React.FC<ObjectManipulatorProps> = ({ id, src, s
                 clipPath: state.crop
                     ? `inset(${state.crop.top}% ${state.crop.right}% ${state.crop.bottom}% ${state.crop.left}%)`
                     : 'none',
-                transition: isPlaying ? 'all 3s linear' : 'none', // Add transition
+                transition: isPlaying ? `all ${currentDuration}ms linear` : 'none',
                 cursor: isDragging.current ? 'grabbing' : 'grab',
                 border: isSelected ? '2px solid #00a8ff' : 'none',
                 boxSizing: 'border-box',

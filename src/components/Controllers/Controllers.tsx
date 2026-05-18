@@ -11,11 +11,13 @@ export const Controllers: React.FC = () => {
         keyframes,
         activeKeyframeId,
         isPlaying,
+        currentStepIndex,
         addKeyframe,
         updateKeyframe,
         loadKeyframe,
-        playAnimation,
-        stopAnimation
+        stepNext,
+        stepPrev,
+        exitStepMode,
     } = useImageContext();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -118,7 +120,7 @@ export const Controllers: React.FC = () => {
                     <label style={{ display: 'block', fontSize: '11px', marginBottom: '5px', opacity: 0.7 }}>Duration (ms)</label>
                     <input
                         type="number"
-                        defaultValue={3000}
+                        defaultValue={500}
                         step={100}
                         min={100}
                         onChange={(e) => {
@@ -135,7 +137,7 @@ export const Controllers: React.FC = () => {
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '15px' }}>
                     <Button
                         variant="danger"
-                        onClick={() => addKeyframe((window as any).__nextDuration || 3000)}
+                        onClick={() => addKeyframe((window as any).__nextDuration || 500)}
                         disabled={isPlaying}
                         style={{ flex: 1 }}
                     >
@@ -143,13 +145,33 @@ export const Controllers: React.FC = () => {
                     </Button>
 
                     <Button
-                        variant={isPlaying ? 'warning' : 'success'}
-                        onClick={isPlaying ? stopAnimation : playAnimation}
+                        onClick={stepPrev}
+                        disabled={keyframes.length === 0}
                         style={{ flex: 1 }}
                     >
-                        {isPlaying ? 'Stop' : 'Play'}
+                        Prev
+                    </Button>
+
+                    <Button
+                        variant="success"
+                        onClick={stepNext}
+                        disabled={keyframes.length === 0}
+                        style={{ flex: 1 }}
+                    >
+                        Next
                     </Button>
                 </div>
+
+                {isPlaying && (
+                    <div style={{ marginBottom: '15px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '12px', opacity: 0.7 }}>
+                            Frame {currentStepIndex !== null ? currentStepIndex + 1 : '—'} / {keyframes.length}
+                        </span>
+                        <Button variant="warning" onClick={exitStepMode} style={{ fontSize: '0.75rem', padding: '4px 10px' }}>
+                            Exit
+                        </Button>
+                    </div>
+                )}
 
                 {activeKeyframeId && !isPlaying && (
                     <Button
