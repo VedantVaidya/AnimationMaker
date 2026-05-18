@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useRef, type ReactNode } from 'react';
 import type { ImageObject, TransformState, Keyframe } from '../types';
 
 interface ProjectFile {
@@ -7,6 +7,14 @@ interface ProjectFile {
     imageStates: Record<string, TransformState>;
     keyframes: Keyframe[];
 }
+
+interface Snapshot {
+    images: ImageObject[];
+    imageStates: Record<string, TransformState>;
+    keyframes: Keyframe[];
+}
+
+const MAX_HISTORY = 20;
 
 interface ImageContextType {
     images: ImageObject[];
@@ -17,6 +25,7 @@ interface ImageContextType {
     isPlaying: boolean;
     currentDuration: number;
     currentStepIndex: number | null;
+    canUndo: boolean;
 
     addImage: (file: File) => void;
     removeImage: (id: string) => void;
@@ -30,7 +39,8 @@ interface ImageContextType {
     stepNext: () => void;
     stepPrev: () => void;
     exitStepMode: () => void;
-    reorderKeyframes: (fromIndex: number, toIndex: number) => void;
+    reorderKeyframes: (fromIndex: number, gapIndex: number) => void;
+    undo: () => void;
     saveProject: () => Promise<void>;
     loadProject: (file: File) => Promise<void>;
 }
@@ -58,6 +68,40 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentDuration, setCurrentDuration] = useState(500);
     const [currentStepIndex, setCurrentStepIndex] = useState<number | null>(null);
+    const [history, setHistory] = useState<Snapshot[]>([]);
+
+    // Refs so pushHistory always reads the latest state values
+    const imagesRef = useRef(images);
+    const imageStatesRef = useRef(imageStates);
+    const keyframesRef = useRef(keyframes);
+    imagesRef.current = images;
+    imageStatesRef.current = imageStates;
+    keyframesRef.current = keyframes;
+
+    const pushHistory = () => {
+        setHistory((prev) => {
+            const snapshot: Snapshot = {
+                images: [...imagesRef.current],
+                imageStates: JSON.parse(JSON.stringify(imageStatesRef.current)),
+                keyframes: JSON.parse(JSON.stringify(keyframesRef.current)),
+            };
+            const next = [...prev, snapshot];
+            return next.length > MAX_HISTORY ? next.slice(next.length - MAX_HISTORY) : next;
+        });
+    };
+
+    const undo = () => {
+        setHistory((prev) => {
+            if (prev.length === 0) return prev;
+            const snapshot = prev[prev.length - 1];
+            setImages(snapshot.images);
+            setImageStates(snapshot.imageStates);
+            setKeyframes(snapshot.keyframes);
+            setSelectedImageId(null);
+            setActiveKeyframeId(null);
+            return prev.slice(0, -1);
+        });
+    };
 
     const addImage = (file: File) => {
         const objectUrl = URL.createObjectURL(file);
@@ -65,6 +109,8 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         img.src = objectUrl;
 
         img.onload = () => {
+            pushHistory();
+
             const aspectRatio = img.naturalWidth / img.naturalHeight;
             let width = 200;
             let height = 200;
@@ -91,7 +137,7 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 rotation: 0,
                 scaleX: 1,
                 scaleY: 1,
-                zIndex: Object.keys(imageStates).length + 1,
+                zIndex: Object.keys(imageStatesRef.current).length + 1,
             };
 
             setImages((prev) => [...prev, newImage]);
@@ -114,11 +160,9 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     const removeImage = (id: string) => {
-        setImages((prev) => {
-            const img = prev.find((i) => i.id === id);
-            if (img) URL.revokeObjectURL(img.src);
-            return prev.filter((i) => i.id !== id);
-        });
+        pushHistory();
+        // No URL.revokeObjectURL here so undo can restore the image
+        setImages((prev) => prev.filter((i) => i.id !== id));
         setImageStates((prev) => {
             const { [id]: _deleted, ...rest } = prev;
             return rest;
@@ -126,22 +170,24 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     const addKeyframe = (duration: number = 500) => {
+        pushHistory();
         const newKeyframe: Keyframe = {
             id: crypto.randomUUID(),
             timestamp: Date.now(),
             duration,
-            objectsState: JSON.parse(JSON.stringify(imageStates)),
+            objectsState: JSON.parse(JSON.stringify(imageStatesRef.current)),
         };
         setKeyframes((prev) => [...prev, newKeyframe]);
         setActiveKeyframeId(newKeyframe.id);
     };
 
     const updateKeyframe = (id: string, duration?: number) => {
+        pushHistory();
         setKeyframes((prev) => prev.map((kf) =>
             kf.id === id
                 ? {
                     ...kf,
-                    objectsState: JSON.parse(JSON.stringify(imageStates)),
+                    objectsState: JSON.parse(JSON.stringify(imageStatesRef.current)),
                     duration: duration !== undefined ? duration : kf.duration,
                 }
                 : kf
@@ -149,7 +195,7 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     const loadKeyframe = (id: string) => {
-        const kf = keyframes.find((k) => k.id === id);
+        const kf = keyframesRef.current.find((k) => k.id === id);
         if (kf) {
             setImageStates(JSON.parse(JSON.stringify(kf.objectsState)));
             setActiveKeyframeId(id);
@@ -158,6 +204,7 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     const deleteKeyframe = (id: string) => {
+        pushHistory();
         setKeyframes((prev) => prev.filter((k) => k.id !== id));
         if (activeKeyframeId === id) setActiveKeyframeId(null);
     };
@@ -187,10 +234,10 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     const reorderKeyframes = (fromIndex: number, gapIndex: number) => {
+        pushHistory();
         setKeyframes((prev) => {
             const updated = [...prev];
             const [moved] = updated.splice(fromIndex, 1);
-            // After removal, indices after fromIndex shift down by 1
             const insertAt = gapIndex > fromIndex ? gapIndex - 1 : gapIndex;
             updated.splice(insertAt, 0, moved);
             return updated;
@@ -241,6 +288,7 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setSelectedImageId(null);
         setIsPlaying(false);
         setCurrentStepIndex(null);
+        setHistory([]);
     };
 
     return (
@@ -253,6 +301,7 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             isPlaying,
             currentDuration,
             currentStepIndex,
+            canUndo: history.length > 0,
             addImage,
             removeImage,
             selectImage,
@@ -265,6 +314,7 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             stepPrev,
             exitStepMode,
             reorderKeyframes,
+            undo,
             saveProject,
             loadProject,
         }}>

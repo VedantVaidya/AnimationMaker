@@ -4,6 +4,7 @@ import { Button } from '../common/Button';
 
 export const Controllers: React.FC = () => {
     const {
+        images,
         addImage,
         selectedImageId,
         imageStates,
@@ -17,8 +18,11 @@ export const Controllers: React.FC = () => {
         loadKeyframe,
         stepNext,
         stepPrev,
+        removeImage,
         exitStepMode,
         reorderKeyframes,
+        undo,
+        canUndo,
         saveProject,
         loadProject,
     } = useImageContext();
@@ -67,6 +71,9 @@ export const Controllers: React.FC = () => {
                 </Button>
                 <Button onClick={() => projectInputRef.current?.click()} style={{ flex: 1, fontSize: '0.8rem' }}>
                     Load
+                </Button>
+                <Button onClick={undo} disabled={!canUndo} style={{ flex: 1, fontSize: '0.8rem' }}>
+                    Undo
                 </Button>
             </div>
 
@@ -141,6 +148,36 @@ export const Controllers: React.FC = () => {
                             ))}
                         </div>
                     </div>
+
+                    <Button
+                        variant="danger"
+                        fullWidth
+                        onClick={() => {
+                            updateImageState(selectedImageId, { hidden: true });
+                            selectImage(null);
+                        }}
+                        style={{ marginTop: '5px' }}
+                    >
+                        Delete Image
+                    </Button>
+                </div>
+            )}
+
+            {/* Hidden images — restore panel */}
+            {images.some((img) => imageStates[img.id]?.hidden) && (
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '12px' }}>
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', opacity: 0.6 }}>Hidden Images</h4>
+                    {images.filter((img) => imageStates[img.id]?.hidden).map((img) => (
+                        <div key={img.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '11px', opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>{img.name}</span>
+                            <Button
+                                onClick={() => updateImageState(img.id, { hidden: false })}
+                                style={{ fontSize: '0.7rem', padding: '3px 8px' }}
+                            >
+                                Restore
+                            </Button>
+                        </div>
+                    ))}
                 </div>
             )}
 

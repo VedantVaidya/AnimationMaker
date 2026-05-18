@@ -16,7 +16,7 @@ export const PreviewWindow: React.FC = () => {
             onClick={() => selectImage(null)} // Deselect when clicking background
         >
             {images.map((img) => (
-                imageStates[img.id] && (
+                imageStates[img.id] && !imageStates[img.id].hidden && (
                     <ObjectManipulator
                         key={img.id}
                         id={img.id}

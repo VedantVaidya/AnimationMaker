@@ -13,6 +13,7 @@ export type TransformState = {
     scaleX: number; // For flipping: 1 or -1
     scaleY: number; // For flipping: 1 or -1
     zIndex: number;
+    hidden?: boolean;
     crop?: {
         top: number;
         right: number;
