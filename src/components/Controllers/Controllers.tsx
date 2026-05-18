@@ -18,12 +18,26 @@ export const Controllers: React.FC = () => {
         stepNext,
         stepPrev,
         exitStepMode,
+        reorderKeyframes,
+        saveProject,
+        loadProject,
     } = useImageContext();
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const projectInputRef = useRef<HTMLInputElement>(null);
+    const dragIndexRef = useRef<number | null>(null);
+    const [dropGap, setDropGap] = React.useState<number | null>(null);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             addImage(e.target.files[0]);
+            e.target.value = '';
+        }
+    };
+
+    const handleProjectLoad = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            loadProject(e.target.files[0]);
+            e.target.value = '';
         }
     };
 
@@ -38,6 +52,23 @@ export const Controllers: React.FC = () => {
                 style={{ display: 'none' }}
                 accept="image/*"
             />
+
+            <input
+                type="file"
+                ref={projectInputRef}
+                onChange={handleProjectLoad}
+                style={{ display: 'none' }}
+                accept=".animproj"
+            />
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+                <Button onClick={() => saveProject()} style={{ flex: 1, fontSize: '0.8rem' }}>
+                    Save
+                </Button>
+                <Button onClick={() => projectInputRef.current?.click()} style={{ flex: 1, fontSize: '0.8rem' }}>
+                    Load
+                </Button>
+            </div>
 
             <Button
                 variant="primary"
@@ -190,31 +221,66 @@ export const Controllers: React.FC = () => {
                     overflowY: 'auto',
                     background: 'rgba(0,0,0,0.2)',
                     borderRadius: '8px',
-                    padding: '15px',
+                    padding: '8px 15px',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '12px',
                     border: '1px solid rgba(255,255,255,0.05)'
                 }}>
                     {keyframes.map((kf, index) => (
-                        <div
-                            key={kf.id}
-                            onClick={() => !isPlaying && loadKeyframe(kf.id)}
-                            style={{
-                                width: '14px',
-                                height: '14px',
-                                borderRadius: '50%',
-                                background: activeKeyframeId === kf.id ? '#00d2ff' : 'rgba(255,255,255,0.2)',
-                                cursor: isPlaying ? 'default' : 'pointer',
-                                border: activeKeyframeId === kf.id ? '2px solid rgba(255,255,255,0.5)' : 'none',
-                                flexShrink: 0,
-                                transition: 'all 0.2s ease',
-                                transform: activeKeyframeId === kf.id ? 'scale(1.2)' : 'scale(1)'
-                            }}
-                            title={`Keyframe ${index + 1}`}
-                        />
+                        <React.Fragment key={kf.id}>
+                            {/* Drop zone above this dot */}
+                            <div
+                                style={{ width: '100%', height: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                                onDragOver={(e) => { e.preventDefault(); setDropGap(index); }}
+                                onDragLeave={() => setDropGap(null)}
+                                onDrop={() => {
+                                    if (dragIndexRef.current !== null) reorderKeyframes(dragIndexRef.current, index);
+                                    dragIndexRef.current = null;
+                                    setDropGap(null);
+                                }}
+                            >
+                                <div style={{ width: '70%', height: '2px', borderRadius: '1px', background: dropGap === index ? '#00d2ff' : 'transparent', transition: 'background 0.1s' }} />
+                            </div>
+
+                            {/* The dot */}
+                            <div
+                                draggable={!isPlaying}
+                                onClick={() => !isPlaying && loadKeyframe(kf.id)}
+                                onDragStart={() => { dragIndexRef.current = index; }}
+                                onDragEnd={() => { dragIndexRef.current = null; setDropGap(null); }}
+                                style={{
+                                    width: '14px',
+                                    height: '14px',
+                                    borderRadius: '50%',
+                                    flexShrink: 0,
+                                    background: activeKeyframeId === kf.id ? '#00d2ff' : 'rgba(255,255,255,0.2)',
+                                    border: activeKeyframeId === kf.id ? '2px solid rgba(255,255,255,0.5)' : '2px solid transparent',
+                                    cursor: isPlaying ? 'default' : 'grab',
+                                    transform: activeKeyframeId === kf.id ? 'scale(1.2)' : 'scale(1)',
+                                    transition: 'all 0.2s ease',
+                                }}
+                                title={`Keyframe ${index + 1}`}
+                            />
+                        </React.Fragment>
                     ))}
+
+                    {/* Drop zone after the last dot */}
+                    {keyframes.length > 0 && (
+                        <div
+                            style={{ width: '100%', height: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                            onDragOver={(e) => { e.preventDefault(); setDropGap(keyframes.length); }}
+                            onDragLeave={() => setDropGap(null)}
+                            onDrop={() => {
+                                if (dragIndexRef.current !== null) reorderKeyframes(dragIndexRef.current, keyframes.length);
+                                dragIndexRef.current = null;
+                                setDropGap(null);
+                            }}
+                        >
+                            <div style={{ width: '70%', height: '2px', borderRadius: '1px', background: dropGap === keyframes.length ? '#00d2ff' : 'transparent', transition: 'background 0.1s' }} />
+                        </div>
+                    )}
+
                     {keyframes.length === 0 && (
                         <span style={{ fontSize: '11px', opacity: 0.5, textAlign: 'center' }}>No frames yet</span>
                     )}

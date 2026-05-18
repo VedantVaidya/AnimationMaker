@@ -1,6 +1,13 @@
 import React, { createContext, useContext, useState, type ReactNode } from 'react';
 import type { ImageObject, TransformState, Keyframe } from '../types';
 
+interface ProjectFile {
+    version: 2;
+    images: { id: string; name: string; dataUrl: string }[];
+    imageStates: Record<string, TransformState>;
+    keyframes: Keyframe[];
+}
+
 interface ImageContextType {
     images: ImageObject[];
     imageStates: Record<string, TransformState>;
@@ -23,9 +30,24 @@ interface ImageContextType {
     stepNext: () => void;
     stepPrev: () => void;
     exitStepMode: () => void;
+    reorderKeyframes: (fromIndex: number, toIndex: number) => void;
+    saveProject: () => Promise<void>;
+    loadProject: (file: File) => Promise<void>;
 }
 
 const ImageContext = createContext<ImageContextType | undefined>(undefined);
+
+const toDataUrl = (blobUrl: string): Promise<string> =>
+    fetch(blobUrl)
+        .then((r) => r.blob())
+        .then(
+            (blob) =>
+                new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result as string);
+                    reader.readAsDataURL(blob);
+                })
+        );
 
 export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [images, setImages] = useState<ImageObject[]>([]);
@@ -164,7 +186,59 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         stepTo(prevIndex);
     };
 
+    const reorderKeyframes = (fromIndex: number, gapIndex: number) => {
+        setKeyframes((prev) => {
+            const updated = [...prev];
+            const [moved] = updated.splice(fromIndex, 1);
+            // After removal, indices after fromIndex shift down by 1
+            const insertAt = gapIndex > fromIndex ? gapIndex - 1 : gapIndex;
+            updated.splice(insertAt, 0, moved);
+            return updated;
+        });
+    };
+
     const exitStepMode = () => {
+        setIsPlaying(false);
+        setCurrentStepIndex(null);
+    };
+
+    const saveProject = async () => {
+        const project: ProjectFile = {
+            version: 2,
+            images: await Promise.all(
+                images.map(async (img) => ({
+                    id: img.id,
+                    name: img.name,
+                    dataUrl: await toDataUrl(img.src),
+                }))
+            ),
+            imageStates: JSON.parse(JSON.stringify(imageStates)),
+            keyframes: JSON.parse(JSON.stringify(keyframes)),
+        };
+
+        const blob = new Blob([JSON.stringify(project)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'project.animproj';
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const loadProject = async (file: File) => {
+        const project: ProjectFile = JSON.parse(await file.text());
+
+        images.forEach((img) => URL.revokeObjectURL(img.src));
+
+        setImages(project.images.map((entry) => ({
+            id: entry.id,
+            name: entry.name,
+            src: entry.dataUrl,
+        })));
+        setImageStates(project.imageStates);
+        setKeyframes(project.keyframes);
+        setActiveKeyframeId(null);
+        setSelectedImageId(null);
         setIsPlaying(false);
         setCurrentStepIndex(null);
     };
@@ -190,6 +264,9 @@ export const ImageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             stepNext,
             stepPrev,
             exitStepMode,
+            reorderKeyframes,
+            saveProject,
+            loadProject,
         }}>
             {children}
         </ImageContext.Provider>
