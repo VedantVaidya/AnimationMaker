@@ -36,6 +36,14 @@
     /* For panning if needed later, or hidden to contain images */
 }
 
+.hidden {
+    display: none;
+}
+
+.previewFullscreen {
+    width: 100%;
+}
+
 /* Scrollbar styling for controllers */
 .controllers::-webkit-scrollbar {
     width: 6px;
